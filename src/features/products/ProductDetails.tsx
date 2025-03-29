@@ -1,9 +1,9 @@
-// src/features/products/ProductDetails.tsx
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { productService } from '../../services/api';
 import { toast } from 'sonner';
+import { useCart } from '../../contexts/CartContext';
 
 // Detailed Product Type Definition
 interface Product {
@@ -23,6 +23,7 @@ interface Product {
 const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const productId = parseInt(id || '0', 10);
+  const { openCartModal } = useCart();
 
   const { 
     data: product, 
@@ -59,6 +60,16 @@ const ProductDetails: React.FC = () => {
   const calculateDiscountedPrice = () => {
     const discount = product.price * (product.discountPercentage / 100);
     return (product.price - discount).toFixed(2);
+  };
+
+  const handleAddToCart = () => {
+    openCartModal({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      thumbnail: product.thumbnail,
+      discountPercentage: product.discountPercentage
+    });
   };
 
   return (
@@ -144,6 +155,7 @@ const ProductDetails: React.FC = () => {
             <button 
               className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
               disabled={product.stock === 0}
+              onClick={handleAddToCart}
             >
               {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
             </button>
@@ -155,6 +167,8 @@ const ProductDetails: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Comments section will be added next */}
     </div>
   );
 };
