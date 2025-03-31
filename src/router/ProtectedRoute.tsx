@@ -1,30 +1,31 @@
 // src/router/ProtectedRoute.tsx
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { User } from '../types/user';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'ADMIN' | 'USER' | 'MANAGER';
-  requiredPermission?: string;
+  requiredRoles?: Array<User['role']>; // Changed from requiredRole to requiredRoles
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredRole, 
-  requiredPermission 
-}) => {
-  const { user, hasPermission } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRoles }) => {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  if (requiredPermission && !hasPermission(requiredPermission)) {
+  if (requiredRoles && !requiredRoles.includes(user.role)) {
+    // Allow admin access to all routes
+    if (user.role === 'admin') {
+      return <>{children}</>;
+    }
     return <Navigate to="/unauthorized" replace />;
   }
 

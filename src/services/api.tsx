@@ -71,9 +71,9 @@ export const commentService = {
     }
   },
   
-  async getPostComments(postId: number) {
+  async getProductComments(productId: number) {
     try {
-      const response = await apiClient.get(`/comments/post/${postId}`);
+      const response = await apiClient.get(`/comments/post/${productId}`);
       return response.data;
     } catch (error) {
       handleApiError(error);

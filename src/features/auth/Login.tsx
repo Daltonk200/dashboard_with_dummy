@@ -1,6 +1,5 @@
-// src/features/auth/Login.tsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -10,15 +9,19 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get the return URL from location state, or default to dashboard
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login({ username, password });
+      await login(username, password);
       toast.success('Login Successful!');
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     } catch (error) {
       toast.error('Login Failed. Please check your credentials.');
       console.error('Login error:', error);

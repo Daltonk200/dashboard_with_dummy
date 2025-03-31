@@ -8,12 +8,13 @@ export interface CartItem {
   thumbnail: string;
   quantity: number;
   discountPercentage?: number;
+  stock?: number; // Add stock property
 }
 
 // Define the Cart context structure
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (product: Omit<CartItem, 'quantity'>) => void;
+  addToCart: (product: Omit<CartItem, 'quantity'> | CartItem) => void; // Updated to accept product with quantity
   removeFromCart: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
@@ -64,24 +65,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     localStorage.setItem('cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // Add item to cart
-  const addToCart = (product: Omit<CartItem, 'quantity'>) => {
+  // Add item to cart - updated to handle quantity
+  const addToCart = (product: Omit<CartItem, 'quantity'> | CartItem) => {
     setCartItems(prevItems => {
       const existingItem = prevItems.find(item => item.id === product.id);
+      const quantityToAdd = 'quantity' in product ? product.quantity : 1;
       
       if (existingItem) {
         // If item already exists, increase quantity
         return prevItems.map(item => 
           item.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 } 
+            ? { ...item, quantity: item.quantity + quantityToAdd } 
             : item
         );
       } else {
-        // If item doesn't exist, add it with quantity 1
-        return [...prevItems, { ...product, quantity: 1 }];
+        // If item doesn't exist, add it with specified quantity or default to 1
+        return [...prevItems, { 
+          ...product, 
+          quantity: quantityToAdd 
+        } as CartItem];
       }
     });
-    closeCartModal();
   };
 
   // Remove item from cart

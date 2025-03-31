@@ -1,9 +1,13 @@
-import React from 'react';
+// Updated src/features/products/ProductDetails.tsx
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { productService } from '../../services/api';
+import { productService, commentService } from '../../services/api';
 import { toast } from 'sonner';
 import { useCart } from '../../contexts/CartContext';
+import CommentList, { Comment } from './components/CommentList';
+import CommentForm from './components/CommentForm';
+import { getProductComments, addComment, updateComment, deleteComment } from '../../utils/commentStorage';
 
 // Detailed Product Type Definition
 interface Product {
@@ -24,7 +28,12 @@ const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const productId = parseInt(id || '0', 10);
   const { openCartModal } = useCart();
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [localComments, setLocalComments] = useState<Comment[]>([]);
+  const [allComments, setAllComments] = useState<Comment[]>([]);
+  const [editingComment, setEditingComment] = useState<Comment | null>(null);
 
+  // Product details query
   const { 
     data: product, 
     isLoading, 
@@ -39,7 +48,116 @@ const ProductDetails: React.FC = () => {
     enabled: !!productId
   });
 
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  // Comments query from API
+  const {
+    data: apiComments,
+    isLoading: isLoadingComments,
+  } = useQuery<{ comments: Comment[] }, Error>({
+    queryKey: ['productComments', productId],
+    queryFn: () => commentService.getProductComments(productId),
+    onError: (error: Error) => {
+      toast.error(`Failed to load comments: ${error.message}`);
+      console.error(error);
+    },
+    enabled: !!productId
+  });
+
+  // Load local comments from localStorage
+  useEffect(() => {
+    if (productId) {
+      const userComments = getProductComments(productId);
+      setLocalComments(userComments);
+    }
+  }, [productId]);
+
+  // Combine API and local comments
+  useEffect(() => {
+    const remoteComments = apiComments?.comments || [];
+    // Transform API comments to match our structure
+    const formattedRemoteComments = remoteComments.map(comment => ({
+      ...comment,
+      productId,
+      isLocal: false
+    }));
+
+    setAllComments([...formattedRemoteComments, ...localComments]);
+  }, [apiComments, localComments, productId]);
+
+  // Handle adding a new comment
+  const handleAddComment = (newComment: Omit<Comment, 'id'>) => {
+    try {
+      const savedComment = addComment(newComment);
+      setLocalComments(prev => [...prev, savedComment]);
+      toast.success('Comment added successfully!');
+    } catch (error) {
+      toast.error('Failed to add comment. Please try again.');
+      console.error(error);
+    }
+  };
+
+  // Handle editing a comment
+  const handleEditComment = (comment: Comment) => {
+    setEditingComment(comment);
+  };
+
+  // Handle comment update submission
+  const handleUpdateComment = (updatedComment: Omit<Comment, 'id'>) => {
+    if (!editingComment) return;
+
+    try {
+      const result = updateComment(editingComment.id, updatedComment.body);
+      if (result) {
+        setLocalComments(prev => 
+          prev.map(comment => 
+            comment.id === editingComment.id ? result : comment
+          )
+        );
+        setEditingComment(null);
+        toast.success('Comment updated successfully!');
+      }
+    } catch (error) {
+      toast.error('Failed to update comment. Please try again.');
+      console.error(error);
+    }
+  };
+
+  // Handle deleting a comment
+  const handleDeleteComment = (commentId: string) => {
+    try {
+      const success = deleteComment(commentId);
+      if (success) {
+        setLocalComments(prev => prev.filter(comment => comment.id !== commentId));
+        toast.success('Comment deleted successfully!');
+      }
+    } catch (error) {
+      toast.error('Failed to delete comment. Please try again.');
+      console.error(error);
+    }
+  };
+
+  // Handle canceling comment edit
+  const handleCancelEdit = () => {
+    setEditingComment(null);
+  };
+
+  const calculateDiscountedPrice = () => {
+    if (!product) return '0.00';
+    const discount = product.price * (product.discountPercentage / 100);
+    return (product.price - discount).toFixed(2);
+  };
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    
+    openCartModal({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      thumbnail: product.thumbnail,
+      discountPercentage: product.discountPercentage,
+      stock: product.stock  // Add stock information here
+    });
+  };
 
   if (isLoading) {
     return (
@@ -56,21 +174,6 @@ const ProductDetails: React.FC = () => {
       </div>
     );
   }
-
-  const calculateDiscountedPrice = () => {
-    const discount = product.price * (product.discountPercentage / 100);
-    return (product.price - discount).toFixed(2);
-  };
-
-  const handleAddToCart = () => {
-    openCartModal({
-      id: product.id,
-      title: product.title,
-      price: product.price,
-      thumbnail: product.thumbnail,
-      discountPercentage: product.discountPercentage
-    });
-  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -168,7 +271,36 @@ const ProductDetails: React.FC = () => {
         </div>
       </div>
       
-      {/* Comments section will be added next */}
+      {/* Comments Section */}
+      <div className="mt-12 border-t pt-8">
+        <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
+        
+        {isLoadingComments ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-8">
+              <CommentList 
+                comments={allComments}
+                onEditComment={handleEditComment}
+                onDeleteComment={handleDeleteComment}
+              />
+            </div>
+            
+            <div className="bg-gray-50 p-6 rounded-lg border">
+              <h3 className="text-lg font-semibold mb-4">Leave Your Review</h3>
+              <CommentForm 
+                productId={productId}
+                onSubmit={editingComment ? handleUpdateComment : handleAddComment}
+                editingComment={editingComment}
+                onCancelEdit={handleCancelEdit}
+              />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

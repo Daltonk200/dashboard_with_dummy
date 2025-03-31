@@ -1,61 +1,60 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useState, useContext, ReactNode } from "react";
-import { loginUser } from "../services/auth";
-import { setupInterceptors } from "../utils/errorHandler";
-
-// Expanded User Interface with Roles
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: 'ADMIN' | 'USER' | 'MANAGER';
-  permissions: string[];
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User } from '../types/user';
 
 interface AuthContextType {
   user: User | null;
-  login: (credentials: { username: string; password: string }) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  hasPermission: (permission: string) => boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = async (credentials: { username: string; password: string }) => {
+  useEffect(() => {
+    // Check for stored user data on component mount
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setIsLoading(false);
+  }, []);
+
+  const login = async (username: string, password: string) => {
     try {
-      const userData = await loginUser(credentials);
-      setUser({
-        ...userData,
-        role: userData.role || 'USER',
-        permissions: userData.permissions || []
+      const response = await fetch('https://dummyjson.com/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
       });
-      
-      // Setup axios interceptors after login
-      setupInterceptors(logout);
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {
-      console.error('Login failed', error);
+      console.error('Login error:', error);
       throw error;
     }
   };
 
   const logout = () => {
     setUser(null);
-    // Clear any stored tokens
-    localStorage.removeItem('user_token');
-  };
-
-  const hasPermission = (permission: string) => {
-    return user?.permissions.includes(permission) || 
-           (user?.role === 'ADMIN' && true);
+    localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -63,8 +62,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
