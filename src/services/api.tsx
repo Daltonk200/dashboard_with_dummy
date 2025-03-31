@@ -71,15 +71,15 @@ export const commentService = {
     }
   },
   
-  async getProductComments(productId: number) {
-    try {
-      const response = await apiClient.get(`/comments/post/${productId}`);
-      return response.data;
-    } catch (error) {
-      handleApiError(error);
-      throw error;
-    }
-  }
+  // async getProductComments(productId: number) {
+  //   try {
+  //     const response = await apiClient.get(`/comments/post/${productId}`);
+  //     return response.data;
+  //   } catch (error) {
+  //     handleApiError(error);
+  //     throw error;
+  //   }
+  // }
 };
 
 export const userService = {

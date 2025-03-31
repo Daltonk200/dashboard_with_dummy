@@ -1,70 +1,72 @@
 // src/utils/commentStorage.ts
+import { v4 as uuidv4 } from 'uuid';
 import { Comment } from '../features/products/components/CommentList';
 
-// Key for localStorage
-const LOCAL_COMMENTS_KEY = 'product_comments';
+const COMMENTS_STORAGE_KEY = 'user_comments';
+// Get all comments from storage
+const getAllComments = (): Comment[] => {
+  const comments = localStorage.getItem(COMMENTS_STORAGE_KEY);
+  return comments ? JSON.parse(comments) : [];
+};
 
-// Get all comments from localStorage
-export const getLocalComments = (): Comment[] => {
-  const storedComments = localStorage.getItem(LOCAL_COMMENTS_KEY);
-  return storedComments ? JSON.parse(storedComments) : [];
+// Save all comments to storage
+const saveAllComments = (comments: Comment[]): void => {
+  localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
 };
 
 // Get comments for a specific product
 export const getProductComments = (productId: number): Comment[] => {
-  const allComments = getLocalComments();
+  const allComments = getAllComments();
   return allComments.filter(comment => comment.productId === productId);
 };
-
+  
 // Add a new comment
 export const addComment = (comment: Omit<Comment, 'id'>): Comment => {
-  const allComments = getLocalComments();
-  
-  // Create a new comment with a unique ID
-  const newComment: Comment = {
+  const allComments = getAllComments();
+  const newComment = {
     ...comment,
-    id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: uuidv4()
   };
   
-  // Save to localStorage
-  localStorage.setItem(LOCAL_COMMENTS_KEY, JSON.stringify([...allComments, newComment]));
+  allComments.push(newComment);
+  saveAllComments(allComments);
   
   return newComment;
 };
 
 // Update an existing comment
-export const updateComment = (id: string, body: string): Comment | null => {
-  const allComments = getLocalComments();
-  const commentIndex = allComments.findIndex(comment => comment.id === id);
+export const updateComment = (commentId: string, newBody: string, newRating?: number): Comment | null => {
+  const allComments = getAllComments();
+  const commentIndex = allComments.findIndex(comment => comment.id === commentId);
   
   if (commentIndex === -1) return null;
   
   // Update the comment
-  const updatedComment = { 
-    ...allComments[commentIndex], 
-    body,
-    createdAt: new Date().toISOString() // Update timestamp to show it was edited
-  };
+  const updatedComment = {
+    ...allComments[commentIndex],
+    body: newBody
+};
+  
+  // Update rating if provided
+  if (newRating !== undefined) {
+    updatedComment.rating = newRating;
+  }
   
   allComments[commentIndex] = updatedComment;
-  
-  // Save to localStorage
-  localStorage.setItem(LOCAL_COMMENTS_KEY, JSON.stringify(allComments));
+  saveAllComments(allComments);
   
   return updatedComment;
 };
 
 // Delete a comment
-export const deleteComment = (id: string): boolean => {
-  const allComments = getLocalComments();
-  const filteredComments = allComments.filter(comment => comment.id !== id);
+export const deleteComment = (commentId: string): boolean => {
+  const allComments = getAllComments();
+  const filteredComments = allComments.filter(comment => comment.id !== commentId);
   
   if (filteredComments.length === allComments.length) {
     return false; // Comment not found
   }
   
-  // Save to localStorage
-  localStorage.setItem(LOCAL_COMMENTS_KEY, JSON.stringify(filteredComments));
-  
+  saveAllComments(filteredComments);
   return true;
 };

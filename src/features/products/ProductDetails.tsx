@@ -8,6 +8,16 @@ import { useCart } from '../../contexts/CartContext';
 import CommentList, { Comment } from './components/CommentList';
 import CommentForm from './components/CommentForm';
 import { getProductComments, addComment, updateComment, deleteComment } from '../../utils/commentStorage';
+import { format } from 'date-fns';
+
+// Review type from DummyJSON API
+interface Review {
+  rating: number;
+  comment: string;
+  date: string;
+  reviewerName: string;
+  reviewerEmail: string;
+}
 
 // Detailed Product Type Definition
 interface Product {
@@ -22,6 +32,7 @@ interface Product {
   category: string;
   thumbnail: string;
   images: string[];
+  reviews?: Review[]; // Add reviews from DummyJSON
 }
 
 const ProductDetails: React.FC = () => {
@@ -70,6 +81,23 @@ const ProductDetails: React.FC = () => {
     }
   }, [productId]);
 
+  // Convert DummyJSON reviews to our comment format
+  const convertReviewsToComments = (reviews: Review[] = []): Comment[] => {
+    return reviews.map((review, index) => ({
+      id: `api-review-${productId}-${index}`,
+      body: review.comment,
+      productId,
+      rating: review.rating,
+      user: {
+        id: index,
+        username: review.reviewerName
+      },
+      isLocal: false,
+      isApiReview: true, // Flag to identify API reviews
+      createdAt: review.date
+    }));
+  };
+
   // Combine API and local comments
   useEffect(() => {
     const remoteComments = apiComments?.comments || [];
@@ -80,8 +108,13 @@ const ProductDetails: React.FC = () => {
       isLocal: false
     }));
 
-    setAllComments([...formattedRemoteComments, ...localComments]);
-  }, [apiComments, localComments, productId]);
+    // Get reviews from product data
+    const reviewComments = product?.reviews 
+      ? convertReviewsToComments(product.reviews) 
+      : [];
+
+    setAllComments([...reviewComments, ...formattedRemoteComments, ...localComments]);
+  }, [apiComments, localComments, productId, product]);
 
   // Handle adding a new comment
   const handleAddComment = (newComment: Omit<Comment, 'id'>) => {
@@ -105,7 +138,7 @@ const ProductDetails: React.FC = () => {
     if (!editingComment) return;
 
     try {
-      const result = updateComment(editingComment.id, updatedComment.body);
+      const result = updateComment(editingComment.id, updatedComment.body,updatedComment.rating);
       if (result) {
         setLocalComments(prev => 
           prev.map(comment => 
@@ -155,7 +188,7 @@ const ProductDetails: React.FC = () => {
       price: product.price,
       thumbnail: product.thumbnail,
       discountPercentage: product.discountPercentage,
-      stock: product.stock  // Add stock information here
+      stock: product.stock // Include stock information
     });
   };
 
